@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Leaflet Map</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.6.0/dist/leaflet.css" integrity="sha512-xwE/Az9zrjBIphAcBb3F6JVqxf46+CDLwfLMHloNu6KEQCAWi6HcDUbeOfBIptF7tcCzusKFjFw2yuvEpDL9wQ==" crossorigin="" />
+    <style type="text/css">
+      body{
+        margin: 0;
+        padding: 0;
+      }
+      #map {
+        width: 100vw;
+        height: 100vh;
+      } 
+    </style>
+
+    
+  </head>
+  <body>
+
+    <div id="mytable">
+      <table id="myTable">
+        <tr>
+            <th>Zipcode</th>
+            <th>City</th>
+            <th>County</th>
+        </tr>
+    </table>
+ 
+    </div>
+   
+    <div id="map"></div>
+
+    <script src="https://unpkg.com/leaflet@1.6.0/dist/leaflet.js" integrity="sha512-gZwIG9x3wUXg2hdXF6+rVkLF/0Vi9U8D2Ntg4Ga5I5BZpVkVxlJWbSQtXPSiUTtC0TjtGOmxa1AJPuV0CPthew==" crossorigin=""></script>
+
+    <script>
+      var res_body ={};
+      
+      const fetchpromise =fetch('http://localhost:4000/gpsdata');
+      fetchpromise.then((response) => response.text())
+        .then((body) => {
+
+
+        res_body = JSON.parse(body);
+        //res_body = body;
+        //console.log("res_body", res_body);
+        var marker1=[];
+        var marker2=[];
+        var node_lon =0;
+        var node_lat = 0;
+        var app_id = 0;
+        var dev_id = 0;
+        
+        res_body.forEach((element,index1) => {
+
+          if (res_body[index1].uplink_message.hasOwnProperty('decoded_payload')) {
+            if (res_body[index1].uplink_message.decoded_payload.hasOwnProperty('altitude'))
+              node_alt =  res_body[index1].uplink_message.decoded_payload.altitude;
+            if (res_body[index1].uplink_message.decoded_payload.hasOwnProperty('longitude'))
+              node_lon =   res_body[index1].uplink_message.decoded_payload.longitude;
+            if (res_body[index1].uplink_message.decoded_payload.hasOwnProperty('latitude'))
+              node_lat =   res_body[index1].uplink_message.decoded_payload.latitude;
+          
+            console.log("index = ", index1);
+            console.log("node_alt", node_alt);
+            console.log("node_lon", node_lon);
+            console.log("node_lat", node_lat);
+            
+            //node_lon =res_body[index1].uplink_message.decoded_payload.longitude;
+            //node_lat =res_body[index1].uplink_message.decoded_payload.latitude;
+          }
+          app_id = res_body[index1].end_device_ids.application_ids.application_id;
+          dev_id = res_body[index1].end_device_ids.device_id;
+
+          var bw = res_body[index1].uplink_message.settings.data_rate.lora.bandwidth;
+          var spreading = res_body[index1].uplink_message.settings.data_rate.lora.spreading_factor;
+          
+          marker1[index1] = marker1[index1]= L.circleMarker([node_lat, node_lon]).bindTooltip("id= "+index1.toString() + ' - ' + app_id + " - " + dev_id + 
+                                                                                              ' bandwidth = ' + bw.toString() + 
+                                                                                              ' spreading-factor = ' + spreading.toString()).addTo(map);
+          var gw_id_txt = "";
+          // handle gateway info
+          res_body[index1].uplink_message.rx_metadata.forEach((element,index2) => {
+            var gw_id =  res_body[index1].uplink_message.rx_metadata[index2].gateway_ids.gateway_id;
+            gw_id_txt = gw_id_txt + gw_id + ' <br> ';
+            var gw_lat = res_body[index1].uplink_message.rx_metadata[index2].location.latitude;
+            var gw_lon = res_body[index1].uplink_message.rx_metadata[index2].location.longitude;
+            var gw_alt = res_body[index1].uplink_message.rx_metadata[index2].location.altitude;
+            var gw_rssi = res_body[index1].uplink_message.rx_metadata[index2].rssi;
+            marker2[index2] = marker2[index2]= L.marker([gw_lat, gw_lon]).bindTooltip("id= "+index1.toString() + ' ' + gw_id + " - rssi = " + gw_rssi.toString() ).addTo(map);
+          
+          });
+
+          marker1[index1] = marker1[index1]= L.circleMarker([node_lat, node_lon]).bindTooltip("id= "+index1.toString() + '<br>' + app_id + '<br>' + dev_id + '<br>' +
+                                                                                              ' bandwidth = ' + bw.toString() + '<br>' +
+                                                                                              ' spreading-factor = ' + spreading.toString() + '<br>' +
+                                                                                              'gw_id = ' + gw_id_txt).addTo(map);
+         
+        });
+      });  
+
+
+      
+        // All the code for the leaflet map will come here
+      var map = L.map('map').setView([48.67, 8.90], 13);
+     
+      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+      }).addTo(map);
+    
+
+    </script>
+  </body>
+</html>
