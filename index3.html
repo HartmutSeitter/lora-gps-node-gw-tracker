@@ -1,0 +1,152 @@
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+
+<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+
+<style>
+    th{ 
+        color:#fff;
+            }
+</style>
+
+
+<table class="table table-striped">
+    <tr  class="bg-info">
+        <th>index</th>
+        <th>app_id</th>
+        <th>dev_id</th>
+        <th>node_lat</th>
+        <th>node_lon</th>
+        <th>gw_id</th>
+        <th>gw_lat</th>
+        <th>gw_lon</th>
+        <th>distance</th>
+        <th>gw_rssi</th>
+
+    </tr>
+
+    <tbody id="myTable">
+        
+    </tbody>
+</table>
+
+
+
+<script>
+    var res_body ={};
+    var table_rows=[];
+    const fetchpromise =fetch('http://localhost:4000/gpsdata');
+    fetchpromise.then((response) => response.text())
+      .then((body) => {
+
+
+      res_body = JSON.parse(body);
+      //res_body = body;
+      //console.log("res_body", res_body);
+      var marker1=[];
+      var marker2=[];
+      var node_lon =0;
+      var node_lat = 0;
+      var app_id = 0;
+      var dev_id = 0;
+      
+      res_body.forEach((element,index1) => {
+
+        if (res_body[index1].uplink_message.hasOwnProperty('decoded_payload')) {
+          if (res_body[index1].uplink_message.decoded_payload.hasOwnProperty('altitude'))
+            node_alt =  res_body[index1].uplink_message.decoded_payload.altitude;
+          if (res_body[index1].uplink_message.decoded_payload.hasOwnProperty('longitude'))
+            node_lon =   res_body[index1].uplink_message.decoded_payload.longitude;
+          if (res_body[index1].uplink_message.decoded_payload.hasOwnProperty('latitude'))
+            node_lat =   res_body[index1].uplink_message.decoded_payload.latitude;
+        
+          //console.log("index = ", index1);
+          //console.log("node_alt", node_alt);
+          //console.log("node_lon", node_lon);
+          //console.log("node_lat", node_lat);
+          
+          //node_lon =res_body[index1].uplink_message.decoded_payload.longitude;
+          //node_lat =res_body[index1].uplink_message.decoded_payload.latitude;
+        }
+        app_id = res_body[index1].end_device_ids.application_ids.application_id;
+        dev_id = res_body[index1].end_device_ids.device_id;
+
+        var bw = res_body[index1].uplink_message.settings.data_rate.lora.bandwidth;
+        var spreading = res_body[index1].uplink_message.settings.data_rate.lora.spreading_factor;
+        
+        var gw_id_txt = "";
+        // handle gateway info
+        var gw_lat_txt = "", gw_lon_txt="", gw_rssi_txt="";
+        var dist=0;
+        res_body[index1].uplink_message.rx_metadata.forEach((element,index2) => {
+          var gw_id =  res_body[index1].uplink_message.rx_metadata[index2].gateway_ids.gateway_id;
+          gw_id_txt = gw_id_txt + gw_id + '<br>';
+          var gw_lat = res_body[index1].uplink_message.rx_metadata[index2].location.latitude;
+          gw_lat_txt = gw_lat_txt + gw_lat.toString() + '<br>';
+          var gw_lon = res_body[index1].uplink_message.rx_metadata[index2].location.longitude;
+          gw_lon_txt = gw_lon_txt + gw_lon.toString() + '<br>';
+          var gw_alt = res_body[index1].uplink_message.rx_metadata[index2].location.altitude;
+          var gw_rssi = res_body[index1].uplink_message.rx_metadata[index2].rssi;
+          gw_rssi_txt = gw_rssi_txt + gw_rssi.toString() + '<br>'; 
+          
+          // calculate distance
+          
+         
+          if ((node_lon>0) & (node_lat>0)){
+            dist= distance(node_lat,node_lon,gw_lat,gw_lon);
+            console.log("dist",dist);
+          }
+          
+        
+        });
+        table_row = {'index': index1, 'app_id':app_id,'dev_id':dev_id, 'node_lat':node_lat, 'node_lon':node_lon, 'gw_id': gw_id_txt, 'gw_lat':gw_lat_txt, 'gw_lon':gw_lon_txt, 'distance':dist, 'gw_rssi':gw_rssi_txt};
+        table_rows.push(table_row);
+  
+    });
+
+
+    buildTable(table_rows);
+    //console.log('distance',distance(node_lat,node_lon,gw_lat,gw_lon));
+        
+        
+    function buildTable(data){
+        var table = document.getElementById('myTable')  
+        for (var i = 0; i < data.length; i++){
+        	var row = `<tr>
+        		    <td>${data[i].index}</td>
+        		    <td>${data[i].app_id}</td>
+        		    <td>${data[i].dev_id}</td>
+                    <td>${data[i].node_lat}</td>
+                    <td>${data[i].node_lon}</td>
+                    <td>${data[i].gw_id}</td>
+                    <td>${data[i].gw_lat}</td>
+                    <td>${data[i].gw_lon}</td>
+                    <td>${data[i].distance}</td>
+                    <td>${data[i].gw_rssi}</td>
+        		</tr>`
+        	table.innerHTML += row
+        }
+    }
+    function distance(lat1, lon1, lat2, lon2, unit) {
+	if ((lat1 == lat2) && (lon1 == lon2)) {
+		return 0;
+	}
+	else {
+		var radlat1 = Math.PI * lat1/180;
+		var radlat2 = Math.PI * lat2/180;
+		var theta = lon1-lon2;
+		var radtheta = Math.PI * theta/180;
+		var dist = Math.sin(radlat1) * Math.sin(radlat2) + Math.cos(radlat1) * Math.cos(radlat2) * Math.cos(radtheta);
+		if (dist > 1) {
+			dist = 1;
+		}
+		dist = Math.acos(dist);
+		dist = dist * 180/Math.PI;
+		dist = dist * 60 * 1.1515;
+		if (unit=="K") { dist = dist * 1.609344 }
+		if (unit=="N") { dist = dist * 0.8684 }
+		return dist;
+	}
+}
+    
+});  
+  </script>
