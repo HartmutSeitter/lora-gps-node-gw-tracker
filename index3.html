@@ -16,10 +16,13 @@
         <th>dev_id</th>
         <th>node_lat</th>
         <th>node_lon</th>
+        <th>node_alt</th>
         <th>gw_id</th>
         <th>gw_lat</th>
         <th>gw_lon</th>
-        <th>distance</th>
+        <th>gw_alt</th>
+        <th>dist_flat</th>
+        <th>dist_alt</th>
         <th>gw_rssi</th>
 
     </tr>
@@ -46,6 +49,7 @@
       var marker2=[];
       var node_lon =0;
       var node_lat = 0;
+      var node_alt = 0;
       var app_id = 0;
       var dev_id = 0;
       
@@ -75,8 +79,9 @@
         
         var gw_id_txt = "";
         // handle gateway info
-        var gw_lat_txt = "", gw_lon_txt="", gw_rssi_txt="";
-        var dist=0;
+        var gw_lat_txt = "", gw_lon_txt="", gw_alt_txt="", gw_rssi_txt="", dist_flat_txt="", dist_alt_txt="";
+        var dist_flat=0;
+        var dist_alt=0;
         res_body[index1].uplink_message.rx_metadata.forEach((element,index2) => {
           var gw_id =  res_body[index1].uplink_message.rx_metadata[index2].gateway_ids.gateway_id;
           gw_id_txt = gw_id_txt + gw_id + '<br>';
@@ -85,20 +90,27 @@
           var gw_lon = res_body[index1].uplink_message.rx_metadata[index2].location.longitude;
           gw_lon_txt = gw_lon_txt + gw_lon.toString() + '<br>';
           var gw_alt = res_body[index1].uplink_message.rx_metadata[index2].location.altitude;
+          gw_alt_txt = gw_alt_txt + gw_alt.toString() + '<br>';
           var gw_rssi = res_body[index1].uplink_message.rx_metadata[index2].rssi;
           gw_rssi_txt = gw_rssi_txt + gw_rssi.toString() + '<br>'; 
           
-          // calculate distance
-          
-         
-          if ((node_lon>0) & (node_lat>0)){
-            dist= distance(node_lat,node_lon,gw_lat,gw_lon);
-            console.log("dist",dist);
+          // calculate distance only if we have valid node gps coordinates
+          if ((node_lon!=0) & (node_lat!=0)){
+            dist_flat= distance(node_lat,node_lon,gw_lat,gw_lon,'K');
+            // in this calculation the altitude is not inclued - distance in km on earth
+            // fixed comma values
+            dist_flat = dist_flat.toFixed(2);
+            
+            // calculate distance including node_altitude and gw_altitude
+            dist_alt = Math.sqrt(((node_alt-gw_alt)/1000)**2 + (dist_flat**2));
+            dist_alt = dist_alt.toFixed(2);
           }
+          // to put the values in a table I need a string
+          dist_flat_txt = dist_flat_txt + dist_flat.toString() + '<br>'; 
+          dist_alt_txt = dist_alt_txt + dist_alt.toString() + '<br>'; 
           
-        
         });
-        table_row = {'index': index1, 'app_id':app_id,'dev_id':dev_id, 'node_lat':node_lat, 'node_lon':node_lon, 'gw_id': gw_id_txt, 'gw_lat':gw_lat_txt, 'gw_lon':gw_lon_txt, 'distance':dist, 'gw_rssi':gw_rssi_txt};
+        table_row = {'index': index1, 'app_id':app_id,'dev_id':dev_id, 'node_lat':node_lat, 'node_lon':node_lon, 'node_alt':node_alt, 'gw_id': gw_id_txt, 'gw_lat':gw_lat_txt, 'gw_lon':gw_lon_txt, 'gw_alt':gw_alt_txt, 'dist_flat':dist_flat_txt, 'dist_alt':dist_alt_txt, 'gw_rssi':gw_rssi_txt};
         table_rows.push(table_row);
   
     });
@@ -115,38 +127,41 @@
         		    <td>${data[i].index}</td>
         		    <td>${data[i].app_id}</td>
         		    <td>${data[i].dev_id}</td>
-                    <td>${data[i].node_lat}</td>
-                    <td>${data[i].node_lon}</td>
-                    <td>${data[i].gw_id}</td>
-                    <td>${data[i].gw_lat}</td>
-                    <td>${data[i].gw_lon}</td>
-                    <td>${data[i].distance}</td>
-                    <td>${data[i].gw_rssi}</td>
+                <td>${data[i].node_lat}</td>
+                <td>${data[i].node_lon}</td>
+                <td>${data[i].node_alt}</td>
+                <td>${data[i].gw_id}</td>
+                <td>${data[i].gw_lat}</td>
+                <td>${data[i].gw_lon}</td>
+                <td>${data[i].gw_alt}</td>
+                <td>${data[i].dist_flat}</td>
+                <td>${data[i].dist_alt}</td>
+                <td>${data[i].gw_rssi}</td>
         		</tr>`
         	table.innerHTML += row
         }
     }
     function distance(lat1, lon1, lat2, lon2, unit) {
-	if ((lat1 == lat2) && (lon1 == lon2)) {
-		return 0;
-	}
-	else {
-		var radlat1 = Math.PI * lat1/180;
-		var radlat2 = Math.PI * lat2/180;
-		var theta = lon1-lon2;
-		var radtheta = Math.PI * theta/180;
-		var dist = Math.sin(radlat1) * Math.sin(radlat2) + Math.cos(radlat1) * Math.cos(radlat2) * Math.cos(radtheta);
-		if (dist > 1) {
-			dist = 1;
-		}
-		dist = Math.acos(dist);
-		dist = dist * 180/Math.PI;
-		dist = dist * 60 * 1.1515;
-		if (unit=="K") { dist = dist * 1.609344 }
-		if (unit=="N") { dist = dist * 0.8684 }
-		return dist;
-	}
-}
+	    if ((lat1 == lat2) && (lon1 == lon2)) {
+		    return 0;
+	    }
+	    else {
+		    var radlat1 = Math.PI * lat1/180;
+		    var radlat2 = Math.PI * lat2/180;
+		    var theta = lon1-lon2;
+		    var radtheta = Math.PI * theta/180;
+		    var dist = Math.sin(radlat1) * Math.sin(radlat2) + Math.cos(radlat1) * Math.cos(radlat2) * Math.cos(radtheta);
+		    if (dist > 1) {
+		    	dist = 1;
+		    }
+		    dist = Math.acos(dist);
+		    dist = dist * 180/Math.PI;
+		    dist = dist * 60 * 1.1515;
+		    if (unit=="K") { dist = dist * 1.609344 }
+		    if (unit=="N") { dist = dist * 0.8684 }
+		    return dist;
+	    }
+   }
     
 });  
   </script>
